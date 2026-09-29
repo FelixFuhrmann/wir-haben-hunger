@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate LunchVote Pro - Betriebliches Speiseplan- & Bestellsystem</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            DEFAULT: '#004c42',
+                            dark: '#00362f',
+                            light: '#006659',
+                            sage: '#829791',
+                            sageLight: '#eef2f1',
+                            accent: '#e07a5f'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Custom Print & UI Styles -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .shadow-lg, .shadow-md, .shadow-sm {
+                box-shadow: none !important;
+            }
+            .border {
+                border-color: #cbd5e1 !important;
+            }
+        }
+        
+        .print-only {
+            display: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #829791;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #004c42;
+        }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col antialiased bg-slate-50" x-data="lunchVoteApp()" x-init="initApp()">
+
+    <!-- Global Notification Banner -->
+    <div x-show="toast.visible" 
+         x-transition:enter="transition ease-out duration-300 transform"
+         x-transition:enter-start="opacity-0 translate-y-[-20px]"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200 transform"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-[-20px]"
+         class="fixed top-4 right-4 z-50 max-w-md p-4 rounded-xl shadow-xl flex items-center gap-3 text-white no-print"
+         :class="{
+             'bg-emerald-700': toast.type === 'success',
+             'bg-rose-700': toast.type === 'error',
+             'bg-amber-600': toast.type === 'warning',
+             'bg-brand': toast.type === 'info'
+         }"
+         style="display: none;">
+        <i class="text-xl" :class="{
+            'fa-solid fa-circle-check': toast.type === 'success',
+            'fa-solid fa-triangle-exclamation': toast.type === 'error',
+            'fa-solid fa-circle-exclamation': toast.type === 'warning',
+            'fa-solid fa-circle-info': toast.type === 'info'
+        }"></i>
+        <div class="flex-1 text-sm font-medium" x-text="toast.message"></div>
+        <button @click="toast.visible = false" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Application Header -->
+    <header class="bg-brand text-white shadow-md sticky top-0 z-40 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-brand-sage/20 border border-brand-sage/40 flex items-center justify-center text-emerald-300 font-bold text-xl shadow-inner">
+                        <i class="fa-solid fa-utensils"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-none tracking-tight flex items-center gap-2">
+                            Corporate LunchVote <span class="bg-brand-light text-white text-xs px-2 py-0.5 rounded-full font-bold uppercase border border-brand-sage/30">Enterprise</span>
+                        </h1>
+                        <p class="text-xs text-brand-sage opacity-90 mt-0.5">Betriebliches Speiseplan- & Bestellsystem</p>
+                    </div>
+                </div>
+
+                <!-- Session Info & Account Controls -->
+                <template x-if="currentUser">
+                    <div class="flex items-center gap-4">
+                        <div class="hidden md:flex items-center gap-2 text-xs bg-brand-dark/60 border border-brand-sage/30 px-3 py-1.5 rounded-lg">
+                            <span class="w-2 h-2 rounded-full" :class="currentUser.role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'"></span>
+                            <span class="text-slate-200">Konto:</span>
+                            <strong class="text-white" x-text="currentUser.name"></strong>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded text-white font-bold uppercase"
+                                  :class="currentUser.role === 'admin' ? 'bg-amber-600' : 'bg-emerald-600'"
+                                  x-text="currentUser.role"></span>
+                        </div>
+
+                        <!-- Profile & Password Switcher -->
+                        <button @click="openProfileModal()" class="flex items-center gap-2 bg-brand-light hover:bg-brand-dark/60 px-3 py-1.5 rounded-xl border border-brand-sage/30 transition text-xs font-medium">
+                            <i class="fa-solid fa-user-gear text-sm text-brand-sage"></i>
+                            <span class="hidden sm:inline">Mein Profil</span>
+                        </button>
+
+                        <button @click="logout()" title="Abmelden" class="p-2 text-brand-sage hover:text-white transition">
+                            <i class="fa-solid fa-right-from-bracket text-base"></i>
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- SYSTEM SETUP ASSISTANT (First Run Only) -->
+        <template x-if="isFirstRun">
+            <div class="max-w-xl mx-auto my-8 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                <div class="bg-brand p-6 text-white text-center space-y-2">
+                    <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto text-3xl text-emerald-300 border border-white/20">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">Ersteinrichtung der Anwendung</h2>
+                    <p class="text-xs text-brand-sage max-w-md mx-auto">Kein Administrator-Konto gefunden. Bitte erstelle jetzt dein persönliches Hauptadministrator-Konto zur Verwaltung des Systems.</p>
+                </div>
+
+                <form @submit.prevent="completeFirstRunSetup()" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Vollständiger Name des Administrators *</label>
+                        <input type="text" x-model="setupForm.name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand" placeholder="z. B. Dr. Sabine Weber">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">E-Mail / Benutzername *</label>
+                        <input type="text" x-model="setupForm.username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand" placeholder="admin">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Sicheres Passwort *</label>
+                            <input type="password" x-model="setupForm.password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand" placeholder="Mindestens 6 Zeichen">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Passwort Bestätigung *</label>
+                            <input type="password" x-model="setupForm.passwordConfirm" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand" placeholder="Passwort wiederholen">
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-start gap-2">
+                        <i class="fa-solid fa-lock text-brand mt-0.5"></i>
+                        <span>Sicherheitshinweis: Das Passwort wird direkt über die native Web Crypto API mit einem individuellen Salt via SHA-256 verschlüsselt gespeichert.</span>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 bg-brand hover:bg-brand-dark text-white font-bold rounded-xl shadow-md transition text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-circle-check"></i> System Initialisieren & Administrator Erstellen
+                    </button>
+                </form>
+            </div>
+        </template>
+
+        <!-- AUTHENTIC LOGIN VIEW (When not logged in and setup complete) -->
+        <template x-if="!currentUser && !isFirstRun">
+            <div class="max-w-md mx-auto my-12 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div class="bg-brand p-6 text-white text-center">
+                    <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl text-emerald-300 border border-white/20">
+                        <i class="fa-solid fa-utensils"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">Anmeldung</h2>
+                    <p class="text-xs text-brand-sage mt-1">Corporate LunchVote Pro Betriebssystem</p>
+                </div>
+
+                <form @submit.prevent="login()" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Benutzername oder E-Mail</label>
+                        <input type="text" x-model="loginForm.username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand text-sm" placeholder="Benutzername eingeben">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Passwort</label>
+                        <input type="password" x-model="loginForm.password" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand text-sm" placeholder="••••••••">
+                    </div>
+
+                    <div x-show="loginError" class="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-center gap-2" style="display: none;">
+                        <i class="fa-solid fa-circle-exclamation text-base"></i>
+                        <span x-text="loginError"></span>
+                    </div>
+
+                    <button type="submit" class="w-full py-2.5 bg-brand hover:bg-brand-dark text-white font-bold rounded-xl shadow-md transition text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> Anmelden
+                    </button>
+                </form>
+            </div>
+        </template>
+
+        <!-- MAIN APPLICATION WORKSPACE -->
+        <template x-if="currentUser">
+            <div class="space-y-6">
+
+                <!-- Top Status Bar & Deadline Countdown -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-brand font-bold text-lg">
+                            <i class="fa-solid fa-calendar-week"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Aktueller Speiseplan der Woche</div>
+                            <div class="text-sm font-bold text-slate-800" x-text="getCurrentWeekRangeText()"></div>
+                        </div>
+                    </div>
+
+                    <!-- Countdown Display -->
+                    <div class="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 w-full sm:w-auto justify-between">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-clock text-amber-600 animate-pulse"></i>
+                            <span class="text-xs font-medium text-slate-600">Bestellfrist:</span>
+                        </div>
+                        <span class="font-mono font-bold text-sm" :class="isDeadlinePassed ? 'text-rose-600' : 'text-brand'" x-text="deadlineText"></span>
+                    </div>
+                </div>
+
+                <!-- ADMIN DASHBOARD TABS -->
+                <template x-if="currentUser.role === 'admin'">
+                    <div class="bg-slate-200/60 p-1.5 rounded-xl flex flex-wrap gap-1 no-print">
+                        <button @click="activeTab = 'menu'" 
+                                :class="activeTab === 'menu' ? 'bg-white text-brand shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+                                class="flex-1 min-w-[130px] py-2.5 text-xs sm:text-sm rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-utensils"></i> Speiseplan
+                        </button>
+                        <button @click="activeTab = 'users'" 
+                                :class="activeTab === 'users' ? 'bg-white text-brand shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+                                class="flex-1 min-w-[130px] py-2.5 text-xs sm:text-sm rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-users"></i> Mitarbeiter
+                        </button>
+                        <button @click="activeTab = 'reports'" 
+                                :class="activeTab === 'reports' ? 'bg-white text-brand shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+                                class="flex-1 min-w-[130px] py-2.5 text-xs sm:text-sm rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-chart-pie"></i> Auswertung & Küche
+                        </button>
+                        <button @click="activeTab = 'settings'" 
+                                :class="activeTab === 'settings' ? 'bg-white text-brand shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'"
+                                class="flex-1 min-w-[130px] py-2.5 text-xs sm:text-sm rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-gears"></i> System-Einstellungen
+                        </button>
+                    </div>
+                </template>
+
+                <!-- MEAL PLAN CALENDAR VIEW (User View & Admin Tab 1) -->
+                <div x-show="currentUser.role === 'user' || activeTab === 'menu'" class="space-y-6">
+
+                    <!-- Admin Toolbar -->
+                    <template x-if="currentUser.role === 'admin'">
+                        <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-sageLight/50 p-4 rounded-xl border border-brand-sage/20 no-print">
+                            <div class="text-xs font-bold text-brand uppercase tracking-wider flex items-center gap-2">
+                                <i class="fa-solid fa-sliders"></i> Speiseplan-Verwaltung
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button @click="openImportModal()" class="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-import text-brand"></i> Speiseplan Importieren
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Days Grid (Mon-Fri) -->
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        <template x-for="day in menuPlan" :key="day.id">
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition hover:shadow-md"
+                                 :class="{ 'opacity-60 bg-slate-50': !day.active }">
+                                
+                                <!-- Day Header -->
+                                <div class="p-3 border-b border-slate-100 flex items-center justify-between"
+                                     :class="isToday(day.date) ? 'bg-brand text-white' : 'bg-slate-100/70 text-slate-800'">
+                                    <div>
+                                        <div class="font-bold text-sm" x-text="day.dayName"></div>
+                                        <div class="text-xs opacity-80" x-text="formatGermanDate(day.date)"></div>
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <span x-show="isToday(day.date)" class="text-[10px] bg-amber-400 text-brand-dark px-1.5 py-0.5 rounded font-extrabold uppercase">Heute</span>
+                                        
+                                        <template x-if="currentUser.role === 'admin'">
+                                            <button @click="toggleDayActive(day.id)" title="Tag aktivieren/deaktivieren" class="p-1 text-xs opacity-70 hover:opacity-100">
+                                                <i class="fa-solid" :class="day.active ? 'fa-toggle-on text-emerald-600 text-lg' : 'fa-toggle-off text-slate-400 text-lg'"></i>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Day Content -->
+                                <div class="p-3 flex-1 space-y-3">
+                                    <template x-if="!day.active">
+                                        <div class="py-8 text-center text-xs text-slate-400 font-medium">
+                                            <i class="fa-solid fa-ban text-2xl mb-1 block"></i>
+                                            Keine Lieferung an diesem Tag.
+                                        </div>
+                                    </template>
+
+                                    <template x-if="day.active">
+                                        <div class="space-y-4">
+                                            <template x-for="meal in day.meals" :key="meal.id">
+                                                <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:border-brand/30 transition overflow-hidden flex flex-col justify-between">
+                                                    
+                                                    <!-- Meal Image (Strict File Upload Data URL or Gradient) -->
+                                                    <div class="relative h-32 w-full bg-slate-100 overflow-hidden group">
+                                                        <template x-if="meal.image">
+                                                            <img :src="meal.image" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="Gericht">
+                                                        </template>
+                                                        <template x-if="!meal.image">
+                                                            <div class="w-full h-full bg-gradient-to-br from-brand/10 to-brand-sage/20 flex flex-col items-center justify-center text-brand-dark p-2 text-center">
+                                                                <i class="fa-solid fa-utensils text-2xl mb-1 opacity-30"></i>
+                                                                <span class="text-[10px] uppercase font-bold text-slate-400">Kein Bild</span>
+                                                            </div>
+                                                        </template>
+
+                                                        <div class="absolute top-2 right-2 bg-brand-dark/80 text-white text-xs font-bold px-2 py-0.5 rounded-md shadow backdrop-blur-sm">
+                                                            <span x-text="formatPrice(meal.price)"></span>
+                                                        </div>
+
+                                                        <div class="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-full shadow flex items-center gap-1">
+                                                            <i class="fa-solid fa-star text-amber-400"></i>
+                                                            <span x-text="getMealAverageRating(meal.id) || 'Neu'"></span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Meal Details -->
+                                                    <div class="p-3 space-y-2 flex-1">
+                                                        <div class="flex items-start justify-between gap-1">
+                                                            <h3 class="font-bold text-xs sm:text-sm text-slate-900 leading-snug" x-text="meal.title"></h3>
+                                                            
+                                                            <template x-if="currentUser.role === 'admin'">
+                                                                <div class="flex items-center gap-1 no-print">
+                                                                    <button @click="openMealModal(day.id, meal)" class="text-xs p-1 text-slate-400 hover:text-brand" title="Bearbeiten">
+                                                                        <i class="fa-solid fa-pen-to-square"></i>
+                                                                    </button>
+                                                                    <button @click="deleteMeal(day.id, meal.id)" class="text-xs p-1 text-slate-400 hover:text-rose-600" title="Löschen">
+                                                                        <i class="fa-solid fa-trash-can"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+
+                                                        <p class="text-xs text-slate-500 line-clamp-2" x-text="meal.description"></p>
+
+                                                        <!-- Badges -->
+                                                        <div class="flex flex-wrap gap-1 pt-1">
+                                                            <template x-for="tag in meal.tags" :key="tag">
+                                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                                                                      :class="{
+                                                                          'bg-emerald-100 text-emerald-800': tag === 'Vegetarisch' || tag === 'Vegan',
+                                                                          'bg-amber-100 text-amber-800': tag === 'Bio',
+                                                                          'bg-blue-100 text-blue-800': tag === 'Low-Carb' || tag === 'Glutenfrei',
+                                                                          'bg-slate-100 text-slate-700': tag !== 'Vegetarisch' && tag !== 'Vegan' && tag !== 'Bio' && tag !== 'Low-Carb' && tag !== 'Glutenfrei'
+                                                                      }"
+                                                                      x-text="tag"></span>
+                                                            </template>
+                                                        </div>
+
+                                                        <!-- Auto Allergen Matching Alert -->
+                                                        <template x-if="checkAllergenConflict(meal).length > 0">
+                                                            <div class="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-900 space-y-1">
+                                                                <div class="font-bold flex items-center gap-1">
+                                                                    <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Hinweis zum Profil:
+                                                                </div>
+                                                                <template x-for="warn in checkAllergenConflict(meal)" :key="warn">
+                                                                    <div class="flex items-center gap-1" x-text="'• ' + warn"></div>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+
+                                                    <!-- Booking Controls -->
+                                                    <div class="p-3 bg-slate-50 border-t border-slate-100 no-print space-y-2">
+                                                        <template x-if="currentUser.role === 'user'">
+                                                            <div class="space-y-2">
+                                                                <template x-if="hasBooking(day.id, meal.id)">
+                                                                    <div class="space-y-2">
+                                                                        <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center justify-between font-semibold">
+                                                                            <span class="flex items-center gap-1">
+                                                                                <i class="fa-solid fa-circle-check text-emerald-600"></i> Gebucht
+                                                                                <span x-text="getBookingGuestText(day.id, meal.id)" class="text-[10px] text-emerald-600"></span>
+                                                                            </span>
+                                                                            <button @click="cancelBooking(day.id, meal.id)" :disabled="isDeadlinePassed" class="text-rose-600 hover:underline text-[11px] disabled:opacity-50">
+                                                                                Stornieren
+                                                                            </button>
+                                                                        </div>
+                                                                        
+                                                                        <!-- Rating for past days -->
+                                                                        <template x-if="isPastDate(day.date)">
+                                                                            <div class="p-2 bg-white rounded-lg border border-slate-200 space-y-1">
+                                                                                <div class="text-[10px] font-bold text-slate-500 uppercase">Deine Bewertung:</div>
+                                                                                <div class="flex items-center gap-1 text-amber-400 text-sm">
+                                                                                    <template x-for="star in [1,2,3,4,5]" :key="star">
+                                                                                        <button @click="rateMeal(meal.id, day.id, star)" class="hover:scale-125 transition">
+                                                                                            <i class="fa-star" :class="getUserRating(meal.id, day.id) >= star ? 'fa-solid' : 'fa-regular'"></i>
+                                                                                        </button>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </div>
+                                                                        </template>
+                                                                    </div>
+                                                                </template>
+
+                                                                <template x-if="!hasBooking(day.id, meal.id)">
+                                                                    <div class="space-y-1.5" x-data="{ guestCount: 0 }">
+                                                                        <div class="flex items-center justify-between text-xs text-slate-600">
+                                                                            <span>Gästeportionen:</span>
+                                                                            <select x-model="guestCount" class="text-xs py-0.5 px-1 rounded border border-slate-300">
+                                                                                <option value="0">+0 Gäste</option>
+                                                                                <option value="1">+1 Gast</option>
+                                                                                <option value="2">+2 Gäste</option>
+                                                                                <option value="3">+3 Gäste</option>
+                                                                            </select>
+                                                                        </div>
+
+                                                                        <button @click="bookMeal(day.id, meal.id, guestCount)" 
+                                                                                :disabled="isDeadlinePassed"
+                                                                                class="w-full py-1.5 bg-brand hover:bg-brand-dark disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-sm">
+                                                                            <i class="fa-solid fa-plus-circle"></i> Verbindlich Bestellen
+                                                                        </button>
+                                                                    </div>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+
+                                                </div>
+                                            </template>
+
+                                            <template x-if="currentUser.role === 'admin'">
+                                                <button @click="openMealModal(day.id)" class="w-full py-2 border-2 border-dashed border-slate-300 hover:border-brand hover:text-brand text-slate-500 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 no-print">
+                                                    <i class="fa-solid fa-plus"></i> Gericht Hinzufügen
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- ICS Calendar Export -->
+                    <template x-if="currentUser.role === 'user'">
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg font-bold">
+                                    <i class="fa-solid fa-calendar-check"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-sm text-slate-800">Termine in Firmenkalender eintragen</div>
+                                    <div class="text-xs text-slate-500">Erzeuge eine standardisierte .ics-Datei für Microsoft Outlook, Apple Kalender oder Google Kalender</div>
+                                </div>
+                            </div>
+
+                            <button @click="exportICS()" class="px-4 py-2 bg-brand hover:bg-brand-dark text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-2">
+                                <i class="fa-solid fa-file-export"></i> ICS-Kalender Herunterladen
+                            </button>
+                        </div>
+                    </template>
+
+                </div>
+
+                <!-- ADMIN TAB 2: USER MANAGEMENT -->
+                <template x-if="currentUser.role === 'admin' && activeTab === 'users'">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-4 p-6 no-print">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-900">Mitarbeiter- & Kontenverwaltung</h2>
+                                <p class="text-xs text-slate-500">Zugangsrechte, Diätprofile und Passwort-Resets verwalten</p>
+                            </div>
+                            <button @click="openUserModal()" class="px-3 py-2 bg-brand hover:bg-brand-dark text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-user-plus"></i> Neuen Mitarbeiter Anlegen
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider">
+                                        <th class="p-3">Status</th>
+                                        <th class="p-3">Name / Benutzername</th>
+                                        <th class="p-3">Rolle</th>
+                                        <th class="p-3">Diät-Profil</th>
+                                        <th class="p-3">Unverträglichkeiten</th>
+                                        <th class="p-3 text-right">Aktionen</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="usr in users" :key="usr.id">
+                                        <tr class="hover:bg-slate-50/80 transition" :class="{ 'opacity-50 bg-slate-50': usr.active === false }">
+                                            <td class="p-3 font-mono">
+                                                <button @click="toggleUserActive(usr.id)" :disabled="usr.id === currentUser.id" title="Konto aktivieren / deaktivieren">
+                                                    <i class="fa-solid text-base" :class="usr.active !== false ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark text-slate-400'"></i>
+                                                </button>
+                                            </td>
+                                            <td class="p-3">
+                                                <div class="font-bold text-slate-900" x-text="usr.name"></div>
+                                                <div class="text-slate-400 text-[11px]" x-text="usr.username"></div>
+                                            </td>
+                                            <td class="p-3">
+                                                <span class="px-2 py-0.5 rounded font-semibold uppercase text-[10px]"
+                                                      :class="usr.role === 'admin' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
+                                                      x-text="usr.role"></span>
+                                            </td>
+                                            <td class="p-3">
+                                                <span class="font-medium text-slate-700" x-text="usr.diet || 'Standard'"></span>
+                                            </td>
+                                            <td class="p-3">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <template x-for="all in usr.allergens" :key="all">
+                                                        <span class="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded text-[10px] font-semibold" x-text="all"></span>
+                                                    </template>
+                                                    <span x-show="!usr.allergens || usr.allergens.length === 0" class="text-slate-400">Keine</span>
+                                                </div>
+                                            </td>
+                                            <td class="p-3 text-right space-x-1">
+                                                <button @click="openUserModal(usr)" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-semibold text-[11px]">
+                                                    <i class="fa-solid fa-pen-to-square"></i> Bearbeiten
+                                                </button>
+                                                <button @click="openResetPasswordModal(usr)" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded font-semibold text-[11px]">
+                                                    <i class="fa-solid fa-key"></i> Passwort
+                                                </button>
+                                                <button @click="deleteUser(usr.id)" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-semibold text-[11px]" :disabled="usr.id === currentUser.id">
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- ADMIN TAB 3: REPORTS & CATERING SUMMARY -->
+                <template x-if="currentUser.role === 'admin' && activeTab === 'reports'">
+                    <div class="space-y-6">
+
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4 no-print">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-900">Sammelbestellung & Küchenansicht</h2>
+                                <p class="text-xs text-slate-500">Aggregierte Bestellmengen für das Catering-Unternehmen</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button @click="exportCSV()" class="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-csv"></i> CSV / Excel Export
+                                </button>
+                                <button @click="triggerPrint()" class="px-3 py-2 bg-brand hover:bg-brand-dark text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-print"></i> Küchenansicht Drucken
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Aggregated Daily Portion Table -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-4 bg-slate-50 border-b border-slate-200 font-bold text-sm text-slate-800 flex items-center justify-between">
+                                <span><i class="fa-solid fa-chart-bar text-brand mr-2"></i> Portionenübersicht pro Gericht</span>
+                                <span class="text-xs text-slate-500 font-normal">Mitarbeiter & Zusatzgäste</span>
+                            </div>
+
+                            <div class="divide-y divide-slate-200">
+                                <template x-for="day in menuPlan" :key="day.id">
+                                    <div class="p-4 space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                                <span class="w-2.5 h-2.5 rounded-full bg-brand"></span>
+                                                <span x-text="day.dayName"></span>
+                                                <span class="text-slate-400 font-normal text-xs" x-text="formatGermanDate(day.date)"></span>
+                                            </h3>
+                                            <span class="text-xs font-bold text-brand bg-brand-sageLight px-2.5 py-1 rounded-full"
+                                                  x-text="'Tagesgesamt: ' + getDayTotalPortions(day.id) + ' Portionen'"></span>
+                                        </div>
+
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                                                <thead class="bg-slate-100 text-slate-600 font-bold">
+                                                    <tr>
+                                                        <th class="p-2.5">Gericht</th>
+                                                        <th class="p-2.5 text-center">Mitarbeiter</th>
+                                                        <th class="p-2.5 text-center">Gäste</th>
+                                                        <th class="p-2.5 text-center bg-brand-sageLight text-brand-dark">Gesamt Portionen</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-slate-100">
+                                                    <template x-for="meal in day.meals" :key="meal.id">
+                                                        <tr>
+                                                            <td class="p-2.5 font-medium text-slate-800" x-text="meal.title"></td>
+                                                            <td class="p-2.5 text-center font-semibold text-slate-700" x-text="getMealPortionSummary(day.id, meal.id).employee"></td>
+                                                            <td class="p-2.5 text-center font-semibold text-slate-700" x-text="getMealPortionSummary(day.id, meal.id).guest"></td>
+                                                            <td class="p-2.5 text-center font-bold text-brand bg-brand-sageLight/50 text-sm" x-text="getMealPortionSummary(day.id, meal.id).total"></td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Employee Matrix -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden no-print">
+                            <div class="p-4 bg-slate-50 border-b border-slate-200 font-bold text-sm text-slate-800">
+                                <i class="fa-solid fa-table-cells text-brand mr-2"></i> Buchungsmatrix aller Mitarbeiter
+                            </div>
+                            <div class="p-4 overflow-x-auto">
+                                <table class="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                            <th class="p-2">Mitarbeiter</th>
+                                            <template x-for="day in menuPlan" :key="day.id">
+                                                <th class="p-2 text-center" x-text="day.dayName"></th>
+                                            </template>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="usr in users.filter(u => u.role === 'user')" :key="usr.id">
+                                            <tr>
+                                                <td class="p-2 font-bold text-slate-800" x-text="usr.name"></td>
+                                                <template x-for="day in menuPlan" :key="day.id">
+                                                    <td class="p-2 text-center">
+                                                        <div x-text="getUserDayBookingText(usr.id, day.id)"
+                                                             class="p-1 rounded text-[11px] font-medium"
+                                                             :class="getUserDayBookingText(usr.id, day.id) !== '-' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-400'"></div>
+                                                    </td>
+                                                </template>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </template>
+
+                <!-- ADMIN TAB 4: SYSTEM SETTINGS -->
+                <template x-if="currentUser.role === 'admin' && activeTab === 'settings'">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 no-print max-w-3xl">
+                        <div class="border-b border-slate-100 pb-4">
+                            <h2 class="text-lg font-bold text-slate-900">System-Konfiguration</h2>
+                            <p class="text-xs text-slate-500">Festlegung der wöchentlichen Bestellfrist und Fristparameter</p>
+                        </div>
+
+                        <form @submit.prevent="saveSettings()" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Stichtag für Wochentag *</label>
+                                    <select x-model="settings.cutoffDay" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                                        <option value="1">Montag</option>
+                                        <option value="2">Dienstag</option>
+                                        <option value="3">Mittwoch</option>
+                                        <option value="4">Donnerstag</option>
+                                        <option value="5">Freitag</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Uhrzeit Stichtag *</label>
+                                    <input type="time" x-model="settings.cutoffTime" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                                </div>
+                            </div>
+
+                            <div class="pt-2">
+                                <button type="submit" class="px-4 py-2 bg-brand text-white font-bold text-xs rounded-xl shadow hover:bg-brand-dark transition">
+                                    Einstellungen Speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </template>
+
+            </div>
+        </template>
+
+        <!-- PRINT ONLY KITCHEN VIEW -->
+        <div class="print-only p-8 space-y-6">
+            <div class="border-b-2 border-black pb-4 flex justify-between items-end">
+                <div>
+                    <h1 class="text-2xl font-bold uppercase">Sammelbestellung Küche / Catering</h1>
+                    <p class="text-sm">Corporate LunchVote Pro</p>
+                </div>
+                <div class="text-right text-xs">
+                    <div>Druckdatum: <span x-text="new Date().toLocaleDateString('de-DE')"></span></div>
+                    <div>Woche: <span x-text="getCurrentWeekRangeText()"></span></div>
+                </div>
+            </div>
+
+            <template x-for="day in menuPlan" :key="day.id">
+                <div class="space-y-2">
+                    <h2 class="text-lg font-bold border-b border-black pb-1 uppercase flex justify-between">
+                        <span x-text="day.dayName + ' (' + formatGermanDate(day.date) + ')'"></span>
+                        <span x-text="'Gesamt: ' + getDayTotalPortions(day.id) + ' Portionen'"></span>
+                    </h2>
+                    <table class="w-full text-xs border-collapse border border-black">
+                        <thead>
+                            <tr class="bg-gray-200 font-bold border-b border-black">
+                                <th class="p-2 text-left border-r border-black">Gericht</th>
+                                <th class="p-2 text-center border-r border-black">Mitarbeiter</th>
+                                <th class="p-2 text-center border-r border-black">Gäste</th>
+                                <th class="p-2 text-center font-bold">GESAMT PORTIONEN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="meal in day.meals" :key="meal.id">
+                                <tr class="border-b border-gray-400">
+                                    <td class="p-2 font-bold border-r border-black" x-text="meal.title"></td>
+                                    <td class="p-2 text-center border-r border-black" x-text="getMealPortionSummary(day.id, meal.id).employee"></td>
+                                    <td class="p-2 text-center border-r border-black" x-text="getMealPortionSummary(day.id, meal.id).guest"></td>
+                                    <td class="p-2 text-center font-bold text-sm" x-text="getMealPortionSummary(day.id, meal.id).total"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: MEAL EDIT / FILE UPLOAD ONLY -->
+    <div x-show="showMealModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print" x-transition style="display: none;">
+        <div @click.outside="showMealModal = false" class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div class="bg-brand px-6 py-4 text-white flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-utensils"></i>
+                    <span x-text="editingMeal.id ? 'Gericht Bearbeiten' : 'Neues Gericht Erstellen'"></span>
+                </h3>
+                <button @click="showMealModal = false" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form @submit.prevent="saveMeal()" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Titel des Gerichts *</label>
+                    <input type="text" x-model="editingMeal.title" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Beschreibung / Zutaten</label>
+                    <textarea x-model="editingMeal.description" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Preis (€) *</label>
+                        <input type="number" step="0.10" x-model="editingMeal.price" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nährwert (kcal)</label>
+                        <input type="number" x-model="editingMeal.calories" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand">
+                    </div>
+                </div>
+
+                <!-- FILE UPLOAD ONLY FIELD -->
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <label class="block text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                        <i class="fa-solid fa-image text-brand"></i> Foto Upload
+                    </label>
+                    <p class="text-[11px] text-slate-500">Wähle eine Bilddatei von deinem Gerät. Das Bild wird lokal komprimiert und gespeichert.</p>
+                    
+                    <input type="file" accept="image/*" @change="handleImageUpload($event)" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand file:text-white hover:file:bg-brand-dark cursor-pointer">
+
+                    <template x-if="editingMeal.image">
+                        <div class="relative w-full h-36 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 mt-2">
+                            <img :src="editingMeal.image" class="w-full h-full object-cover alt="Vorschau">
+                            <button type="button" @click="editingMeal.image = ''" class="absolute top-2 right-2 bg-rose-600 text-white p-1 rounded-full text-xs hover:bg-rose-700 shadow" title="Bild entfernen">
+                                <i class="fa-solid fa-xmark w-4 h-4 flex items-center justify-center"></i>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ernährungskategorien</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="tag in availableTags" :key="tag">
+                            <label class="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold cursor-pointer">
+                                <input type="checkbox" :value="tag" x-model="editingMeal.tags" class="rounded text-brand focus:ring-brand">
+                                <span x-text="tag"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Enthaltene Allergene</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="all in availableAllergens" :key="all">
+                            <label class="inline-flex items-center gap-1 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 text-xs font-semibold text-rose-800 cursor-pointer">
+                                <input type="checkbox" :value="all" x-model="editingMeal.allergens" class="rounded text-rose-600 focus:ring-rose-500">
+                                <span x-text="all"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button type="button" @click="showMealModal = false" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold hover:bg-slate-50">Abbrechen</button>
+                    <button type="submit" class="px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold shadow">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: USER EDIT / CREATE -->
+    <div x-show="showUserModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print" x-transition style="display: none;">
+        <div @click.outside="showUserModal = false" class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div class="bg-brand px-6 py-4 text-white flex items-center justify-between">
+                <h3 class="font-bold text-base" x-text="editingUser.id ? 'Mitarbeiter Bearbeiten' : 'Neuen Mitarbeiter Anlegen'"></h3>
+                <button @click="showUserModal = false" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form @submit.prevent="saveUser()" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Vollständiger Name *</label>
+                    <input type="text" x-model="editingUser.name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Benutzername / E-Mail *</label>
+                    <input type="text" x-model="editingUser.username" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+
+                <template x-if="!editingUser.id">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Initial-Passwort *</label>
+                        <input type="password" x-model="editingUser.initialPassword" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    </div>
+                </template>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Rolle *</label>
+                    <select x-model="editingUser.role" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                        <option value="user">Anwender (Mitarbeiter)</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Diät-Präferenz</label>
+                    <select x-model="editingUser.diet" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                        <option value="none">Keine Einschränkung</option>
+                        <option value="Vegetarisch">Vegetarisch</option>
+                        <option value="Vegan">Vegan</option>
+                        <option value="Low-Carb">Low-Carb</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Unverträglichkeiten / Allergene</label>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="all in availableAllergens" :key="all">
+                            <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded text-xs cursor-pointer">
+                                <input type="checkbox" :value="all" x-model="editingUser.allergens" class="rounded text-brand">
+                                <span x-text="all"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button type="button" @click="showUserModal = false" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold">Abbrechen</button>
+                    <button type="submit" class="px-4 py-2 bg-brand text-white rounded-xl text-xs font-bold shadow">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: ADMIN USER PASSWORD RESET -->
+    <div x-show="showResetPasswordModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print" x-transition style="display: none;">
+        <div @click.outside="showResetPasswordModal = false" class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200">
+            <div class="bg-brand px-6 py-4 text-white flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-key text-amber-300"></i> Passwort Zurücksetzen
+                </h3>
+                <button @click="showResetPasswordModal = false" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form @submit.prevent="executeAdminPasswordReset()" class="p-6 space-y-4">
+                <p class="text-xs text-slate-600">
+                    Neues Passwort festlegen für: <strong class="text-slate-900" x-text="targetResetUser ? targetResetUser.name : ''"></strong>
+                </p>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Neues Passwort *</label>
+                    <input type="password" x-model="adminResetPasswordForm.newPassword" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" @click="showResetPasswordModal = false" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold">Abbrechen</button>
+                    <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow">Passwort Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: USER PROFILE & PASSWORD CHANGE -->
+    <div x-show="showProfileModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print" x-transition style="display: none;">
+        <div @click.outside="showProfileModal = false" class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div class="bg-brand px-6 py-4 text-white flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-user-gear"></i> Mein Profil & Einstellungen
+                </h3>
+                <button @click="showProfileModal = false" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                <!-- Profile Diet Settings -->
+                <form @submit.prevent="saveProfileSettings()" class="space-y-4">
+                    <h4 class="font-bold text-xs text-brand uppercase tracking-wider border-b border-slate-100 pb-2">Diät & Unverträglichkeiten</h4>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Diät-Präferenz</label>
+                        <select x-model="profileForm.diet" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                            <option value="none">Keine Einschränkung</option>
+                            <option value="Vegetarisch">Vegetarisch</option>
+                            <option value="Vegan">Vegan</option>
+                            <option value="Low-Carb">Low-Carb</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Unverträglichkeiten</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="all in availableAllergens" :key="all">
+                                <label class="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-lg text-xs cursor-pointer">
+                                    <input type="checkbox" :value="all" x-model="profileForm.allergens" class="rounded text-brand">
+                                    <span x-text="all"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="px-4 py-2 bg-brand text-white rounded-xl text-xs font-bold shadow">
+                        Profil Speichern
+                    </button>
+                </form>
+
+                <!-- Password Change Form -->
+                <form @submit.prevent="changeMyPassword()" class="space-y-4 pt-4 border-t border-slate-200">
+                    <h4 class="font-bold text-xs text-brand uppercase tracking-wider border-b border-slate-100 pb-2">Passwort Ändern</h4>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Aktuelles Passwort *</label>
+                        <input type="password" x-model="passwordChangeForm.currentPassword" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Neues Passwort *</label>
+                        <input type="password" x-model="passwordChangeForm.newPassword" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Neues Passwort Bestätigen *</label>
+                        <input type="password" x-model="passwordChangeForm.confirmPassword" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    </div>
+
+                    <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow">
+                        Passwort Ändern
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: MENU PARSER / IMPORT -->
+    <div x-show="showImportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 no-print" x-transition style="display: none;">
+        <div @click.outside="showImportModal = false" class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div class="bg-brand px-6 py-4 text-white flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-file-import"></i> Speiseplan / PDF Text-Import
+                </h3>
+                <button @click="showImportModal = false" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-600">Kopiere den Text des wöchentlichen Speiseplans deines Caterers hier hinein oder importiere vorgegebene Zeilen zur automatischen Befüllung.</p>
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Speiseplan Text (Format: Tag | Gericht | Preis)</label>
+                    <textarea x-model="importRawText" rows="6" class="w-full p-3 font-mono text-xs border border-slate-300 rounded-xl" placeholder="Montag | Tagliatelle mit Trüffelcreme | 7.50&#10;Dienstag | Gegrilltes Lachsfilet | 9.20&#10;Mittwoch | Süßkartoffel Curry | 6.80&#10;Donnerstag | Rinder-Schmortopf | 8.50&#10;Freitag | Quinoa Avocado Bowl | 7.20"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="showImportModal = false" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold">Abbrechen</button>
+                    <button type="button" @click="executeParsedImport()" class="px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl text-xs font-bold shadow">Text Verarbeiten & Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function lunchVoteApp() {
+            return {
+                // Application State
+                isFirstRun: false,
+                activeTab: 'menu',
+                currentUser: null,
+                loginForm: { username: '', password: '' },
+                loginError: '',
+
+                // Toast Notification
+                toast: { visible: false, message: '', type: 'info' },
+
+                // Deadline Management
+                deadlineText: '',
+                isDeadlinePassed: false,
+                settings: { cutoffDay: '4', cutoffTime: '12:00' }, // Default Donnerstag 12:00 Uhr
+
+                // First Run Setup Form
+                setupForm: { name: '', username: 'admin', password: '', passwordConfirm: '' },
+
+                // Modals
+                showMealModal: false,
+                showUserModal: false,
+                showResetPasswordModal: false,
+                showProfileModal: false,
+                showImportModal: false,
+                targetDayId: 'mon',
+
+                // Editing State
+                editingMeal: { id: null, title: '', description: '', price: 7.00, image: '', tags: [], allergens: [], calories: 500 },
+                editingUser: { id: null, username: '', name: '', role: 'user', allergens: [], diet: 'none', initialPassword: '' },
+                targetResetUser: null,
+                adminResetPasswordForm: { newPassword: '' },
+
+                // Profile Form
+                profileForm: { diet: 'none', allergens: [] },
+                passwordChangeForm: { currentPassword: '', newPassword: '', confirmPassword: '' },
+
+                // Import State
+                importRawText: 'Montag | Tagliatelle mit Trüffelcreme | 7.50\nDienstag | Gegrilltes Lachsfilet | 9.20\nMittwoch | Süßkartoffel Curry | 6.80\nDonnerstag | Rinder-Schmortopf | 8.50\nFreitag | Quinoa Avocado Bowl | 7.20',
+
+                // Master Categories
+                availableTags: ['Vegetarisch', 'Vegan', 'Bio', 'Low-Carb', 'Glutenfrei', 'Laktosefrei', 'Protein-Boost', 'Klassiker'],
+                availableAllergens: ['Gluten', 'Laktose', 'Nüsse', 'Sellerie', 'Senf', 'Soja', 'Eier', 'Fisch', 'Erdnüsse', 'Sulfit'],
+
+                // Core Data Structures
+                users: [],
+                menuPlan: [],
+                bookings: [],
+                ratings: [],
+
+                initApp() {
+                    this.loadDataFromStorage();
+                    this.startCountdownTimer();
+                },
+
+                // WEB CRYPTO API: Cryptographically Secure Native SHA-256 Hashing with Salt
+                async hashPassword(password, salt = null) {
+                    const encoder = new TextEncoder();
+                    if (!salt) {
+                        const randomBytes = new Uint8Array(16);
+                        window.crypto.getRandomValues(randomBytes);
+                        salt = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                    }
+                    const data = encoder.encode(password + salt);
+                    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    return { hash: hashHex, salt: salt };
+                },
+
+                async verifyPassword(password, storedHash, storedSalt) {
+                    const res = await this.hashPassword(password, storedSalt);
+                    return res.hash === storedHash;
+                },
+
+                notify(msg, type = 'info') {
+                    this.toast.message = msg;
+                    this.toast.type = type;
+                    this.toast.visible = true;
+                    setTimeout(() => { this.toast.visible = false; }, 3500);
+                },
+
+                loadDataFromStorage() {
+                    const savedUsers = localStorage.getItem('lunch_users');
+                    const savedMenu = localStorage.getItem('lunch_menu');
+                    const savedBookings = localStorage.getItem('lunch_bookings');
+                    const savedRatings = localStorage.getItem('lunch_ratings');
+                    const savedSettings = localStorage.getItem('lunch_settings');
+
+                    if (savedSettings) {
+                        this.settings = JSON.parse(savedSettings);
+                    }
+
+                    if (savedUsers) {
+                        this.users = JSON.parse(savedUsers);
+                        if (this.users.length === 0) {
+                            this.isFirstRun = true;
+                        }
+                    } else {
+                        this.isFirstRun = true;
+                    }
+
+                    if (savedMenu) {
+                        this.menuPlan = JSON.parse(savedMenu);
+                    } else {
+                        this.initializeEmptyMenuPlan();
+                    }
+
+                    if (savedBookings) {
+                        this.bookings = JSON.parse(savedBookings);
+                    }
+
+                    if (savedRatings) {
+                        this.ratings = JSON.parse(savedRatings);
+                    }
+                },
+
+                saveUsers() {
+                    localStorage.setItem('lunch_users', JSON.stringify(this.users));
+                },
+
+                saveMenu() {
+                    localStorage.setItem('lunch_menu', JSON.stringify(this.menuPlan));
+                },
+
+                saveBookings() {
+                    localStorage.setItem('lunch_bookings', JSON.stringify(this.bookings));
+                },
+
+                saveRatings() {
+                    localStorage.setItem('lunch_ratings', JSON.stringify(this.ratings));
+                },
+
+                saveSettingsStorage() {
+                    localStorage.setItem('lunch_settings', JSON.stringify(this.settings));
+                },
+
+                async completeFirstRunSetup() {
+                    if (this.setupForm.password !== this.setupForm.passwordConfirm) {
+                        this.notify('Passwörter stimmen nicht überein!', 'error');
+                        return;
+                    }
+                    if (this.setupForm.password.length < 6) {
+                        this.notify('Das Passwort muss mindestens 6 Zeichen lang sein!', 'warning');
+                        return;
+                    }
+
+                    const { hash, salt } = await this.hashPassword(this.setupForm.password);
+
+                    const rootAdmin = {
+                        id: 'usr_' + Date.now(),
+                        username: this.setupForm.username.trim(),
+                        name: this.setupForm.name.trim(),
+                        role: 'admin',
+                        active: true,
+                        passwordHash: hash,
+                        passwordSalt: salt,
+                        allergens: [],
+                        diet: 'none'
+                    };
+
+                    this.users = [rootAdmin];
+                    this.saveUsers();
+                    this.currentUser = rootAdmin;
+                    this.isFirstRun = false;
+                    this.notify('Ersteinrichtung erfolgreich! Hauptadministrator angelegt.', 'success');
+                },
+
+                async login() {
+                    const usernameInput = this.loginForm.username.trim().toLowerCase();
+                    const found = this.users.find(u => u.username.toLowerCase() === usernameInput);
+
+                    if (!found) {
+                        this.loginError = 'Ungültige Anmeldedaten.';
+                        return;
+                    }
+
+                    if (found.active === false) {
+                        this.loginError = 'Dieses Benutzerkonto wurde deaktiviert.';
+                        return;
+                    }
+
+                    const isValid = await this.verifyPassword(this.loginForm.password, found.passwordHash, found.passwordSalt);
+
+                    if (isValid) {
+                        this.currentUser = found;
+                        this.loginError = '';
+                        this.loginForm.password = '';
+                        this.notify(`Willkommen zurück, ${found.name}!`, 'success');
+                    } else {
+                        this.loginError = 'Ungültige Anmeldedaten.';
+                    }
+                },
+
+                logout() {
+                    this.currentUser = null;
+                    this.loginForm = { username: '', password: '' };
+                    this.notify('Erfolgreich abgemeldet.', 'info');
+                },
+
+                openProfileModal() {
+                    if (!this.currentUser) return;
+                    this.profileForm.diet = this.currentUser.diet || 'none';
+                    this.profileForm.allergens = [...(this.currentUser.allergens || [])];
+                    this.passwordChangeForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+                    this.showProfileModal = true;
+                },
+
+                saveProfileSettings() {
+                    if (!this.currentUser) return;
+                    const idx = this.users.findIndex(u => u.id === this.currentUser.id);
+                    if (idx !== -1) {
+                        this.users[idx].diet = this.profileForm.diet;
+                        this.users[idx].allergens = [...this.profileForm.allergens];
+                        this.currentUser = { ...this.users[idx] };
+                        this.saveUsers();
+                        this.notify('Profil-Einstellungen aktualisiert.', 'success');
+                        this.showProfileModal = false;
+                    }
+                },
+
+                async changeMyPassword() {
+                    if (!this.currentUser) return;
+
+                    const isValidCurrent = await this.verifyPassword(
+                        this.passwordChangeForm.currentPassword,
+                        this.currentUser.passwordHash,
+                        this.currentUser.passwordSalt
+                    );
+
+                    if (!isValidCurrent) {
+                        this.notify('Das aktuelle Passwort ist nicht korrekt.', 'error');
+                        return;
+                    }
+
+                    if (this.passwordChangeForm.newPassword !== this.passwordChangeForm.confirmPassword) {
+                        this.notify('Neues Passwort und Bestätigung stimmen nicht überein.', 'error');
+                        return;
+                    }
+
+                    if (this.passwordChangeForm.newPassword.length < 6) {
+                        this.notify('Das neue Passwort muss mindestens 6 Zeichen haben.', 'warning');
+                        return;
+                    }
+
+                    const { hash, salt } = await this.hashPassword(this.passwordChangeForm.newPassword);
+                    const idx = this.users.findIndex(u => u.id === this.currentUser.id);
+
+                    if (idx !== -1) {
+                        this.users[idx].passwordHash = hash;
+                        this.users[idx].passwordSalt = salt;
+                        this.currentUser = { ...this.users[idx] };
+                        this.saveUsers();
+                        this.notify('Dein Passwort wurde erfolgreich geändert!', 'success');
+                        this.showProfileModal = false;
+                    }
+                },
+
+                openUserModal(user = null) {
+                    if (user) {
+                        this.editingUser = JSON.parse(JSON.stringify(user));
+                        this.editingUser.initialPassword = '';
+                    } else {
+                        this.editingUser = { id: null, username: '', name: '', role: 'user', allergens: [], diet: 'none', initialPassword: '' };
+                    }
+                    this.showUserModal = true;
+                },
+
+                async saveUser() {
+                    if (this.editingUser.id) {
+                        const idx = this.users.findIndex(u => u.id === this.editingUser.id);
+                        if (idx !== -1) {
+                            this.users[idx].name = this.editingUser.name.trim();
+                            this.users[idx].username = this.editingUser.username.trim();
+                            this.users[idx].role = this.editingUser.role;
+                            this.users[idx].diet = this.editingUser.diet;
+                            this.users[idx].allergens = [...this.editingUser.allergens];
+                        }
+                    } else {
+                        if (!this.editingUser.initialPassword) {
+                            this.notify('Bitte erstelle ein Initial-Passwort für den neuen Nutzer.', 'error');
+                            return;
+                        }
+
+                        const { hash, salt } = await this.hashPassword(this.editingUser.initialPassword);
+                        const newUser = {
+                            id: 'usr_' + Date.now(),
+                            username: this.editingUser.username.trim(),
+                            name: this.editingUser.name.trim(),
+                            role: this.editingUser.role,
+                            active: true,
+                            passwordHash: hash,
+                            passwordSalt: salt,
+                            diet: this.editingUser.diet,
+                            allergens: [...this.editingUser.allergens]
+                        };
+                        this.users.push(newUser);
+                    }
+
+                    this.saveUsers();
+                    this.showUserModal = false;
+                    this.notify('Benutzerkonto gespeichert.', 'success');
+                },
+
+                toggleUserActive(userId) {
+                    const idx = this.users.findIndex(u => u.id === userId);
+                    if (idx !== -1 && this.users[idx].id !== this.currentUser.id) {
+                        this.users[idx].active = !this.users[idx].active;
+                        this.saveUsers();
+                        this.notify(`Status von ${this.users[idx].name} geändert.`, 'info');
+                    }
+                },
+
+                deleteUser(userId) {
+                    if (userId === this.currentUser.id) return;
+                    if (confirm('Soll dieser Mitarbeiter unwiderruflich gelöscht werden?')) {
+                        this.users = this.users.filter(u => u.id !== userId);
+                        this.saveUsers();
+                        this.notify('Mitarbeiter gelöscht.', 'info');
+                    }
+                },
+
+                openResetPasswordModal(user) {
+                    this.targetResetUser = user;
+                    this.adminResetPasswordForm.newPassword = '';
+                    this.showResetPasswordModal = true;
+                },
+
+                async executeAdminPasswordReset() {
+                    if (!this.targetResetUser || !this.adminResetPasswordForm.newPassword) return;
+
+                    const { hash, salt } = await this.hashPassword(this.adminResetPasswordForm.newPassword);
+                    const idx = this.users.findIndex(u => u.id === this.targetResetUser.id);
+
+                    if (idx !== -1) {
+                        this.users[idx].passwordHash = hash;
+                        this.users[idx].passwordSalt = salt;
+                        this.saveUsers();
+                        this.notify(`Neues Passwort für ${this.targetResetUser.name} gesetzt.`, 'success');
+                        this.showResetPasswordModal = false;
+                    }
+                },
+
+                initializeEmptyMenuPlan() {
+                    const mondayDate = this.getMondayOfCurrentWeek();
+                    this.menuPlan = [
+                        { id: 'mon', dayName: 'Montag', date: this.addDaysISO(mondayDate, 0), active: true, meals: [] },
+                        { id: 'tue', dayName: 'Dienstag', date: this.addDaysISO(mondayDate, 1), active: true, meals: [] },
+                        { id: 'wed', dayName: 'Mittwoch', date: this.addDaysISO(mondayDate, 2), active: true, meals: [] },
+                        { id: 'thu', dayName: 'Donnerstag', date: this.addDaysISO(mondayDate, 3), active: true, meals: [] },
+                        { id: 'fri', dayName: 'Freitag', date: this.addDaysISO(mondayDate, 4), active: true, meals: [] }
+                    ];
+                    this.saveMenu();
+                },
+
+                getMondayOfCurrentWeek() {
+                    const d = new Date();
+                    const day = d.getDay();
+                    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+                    return new Date(d.setDate(diff));
+                },
+
+                addDaysISO(baseDate, days) {
+                    const temp = new Date(baseDate);
+                    temp.setDate(temp.getDate() + days);
+                    return temp.toISOString().split('T')[0];
+                },
+
+                formatGermanDate(isoString) {
+                    if (!isoString) return '';
+                    const parts = isoString.split('-');
+                    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+                },
+
+                formatPrice(price) {
+                    return parseFloat(price).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+                },
+
+                isToday(isoString) {
+                    return isoString === new Date().toISOString().split('T')[0];
+                },
+
+                isPastDate(isoString) {
+                    return isoString < new Date().toISOString().split('T')[0];
+                },
+
+                getCurrentWeekRangeText() {
+                    if (!this.menuPlan || this.menuPlan.length === 0) return '';
+                    const start = this.formatGermanDate(this.menuPlan[0].date);
+                    const end = this.formatGermanDate(this.menuPlan[this.menuPlan.length - 1].date);
+                    return `${start} bis ${end}`;
+                },
+
+                startCountdownTimer() {
+                    const updateTimer = () => {
+                        const now = new Date();
+                        const cutoffDayNum = parseInt(this.settings.cutoffDay) || 4; // 1=Mo, ..., 5=Fr
+                        const [cutoffHour, cutoffMin] = (this.settings.cutoffTime || '12:00').split(':').map(Number);
+
+                        const targetDate = new Date();
+                        const currentDayNum = now.getDay() === 0 ? 7 : now.getDay();
+                        let diffDays = cutoffDayNum - currentDayNum;
+
+                        if (diffDays < 0 || (diffDays === 0 && now.getHours() >= cutoffHour)) {
+                            diffDays += 7;
+                        }
+
+                        targetDate.setDate(now.getDate() + diffDays);
+                        targetDate.setHours(cutoffHour, cutoffMin, 0, 0);
+
+                        const diffMs = targetDate - now;
+
+                        if (diffMs <= 0) {
+                            this.deadlineText = 'Bestellfrist abgelaufen!';
+                            this.isDeadlinePassed = true;
+                        } else {
+                            const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                            const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+                            this.deadlineText = `${hours}h ${mins}m ${secs}s`;
+                            this.isDeadlinePassed = false;
+                        }
+                    };
+                    updateTimer();
+                    setInterval(updateTimer, 1000);
+                },
+
+                saveSettings() {
+                    this.saveSettingsStorage();
+                    this.notify('System-Einstellungen wurden gespeichert.', 'success');
+                },
+
+                handleImageUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > MAX_WIDTH) {
+                                height = Math.round((height * MAX_WIDTH) / width);
+                                width = MAX_WIDTH;
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            this.editingMeal.image = canvas.toDataURL('image/jpeg', 0.8);
+                            this.notify('Foto geladen.', 'success');
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                openMealModal(dayId, meal = null) {
+                    this.targetDayId = dayId;
+                    if (meal) {
+                        this.editingMeal = JSON.parse(JSON.stringify(meal));
+                    } else {
+                        this.editingMeal = { id: null, title: '', description: '', price: 7.00, image: '', tags: [], allergens: [], calories: 500 };
+                    }
+                    this.showMealModal = true;
+                },
+
+                saveMeal() {
+                    const day = this.menuPlan.find(d => d.id === this.targetDayId);
+                    if (!day) return;
+
+                    if (this.editingMeal.id) {
+                        const idx = day.meals.findIndex(m => m.id === this.editingMeal.id);
+                        if (idx !== -1) day.meals[idx] = { ...this.editingMeal };
+                    } else {
+                        this.editingMeal.id = 'meal_' + Date.now();
+                        day.meals.push({ ...this.editingMeal });
+                    }
+
+                    this.saveMenu();
+                    this.showMealModal = false;
+                    this.notify('Gericht gespeichert.', 'success');
+                },
+
+                deleteMeal(dayId, mealId) {
+                    if (!confirm('Möchtest du dieses Gericht wirklich löschen?')) return;
+                    const day = this.menuPlan.find(d => d.id === dayId);
+                    if (day) {
+                        day.meals = day.meals.filter(m => m.id !== mealId);
+                        this.saveMenu();
+                        this.notify('Gericht gelöscht.', 'info');
+                    }
+                },
+
+                toggleDayActive(dayId) {
+                    const day = this.menuPlan.find(d => d.id === dayId);
+                    if (day) {
+                        day.active = !day.active;
+                        this.saveMenu();
+                    }
+                },
+
+                openImportModal() {
+                    this.showImportModal = true;
+                },
+
+                executeParsedImport() {
+                    const lines = this.importRawText.split('\n');
+                    const mondayDate = this.getMondayOfCurrentWeek();
+
+                    lines.forEach((line, index) => {
+                        const parts = line.split('|').map(p => p.trim());
+                        if (parts.length >= 2 && index < 5) {
+                            const dayObj = this.menuPlan[index];
+                            if (dayObj) {
+                                const title = parts[1];
+                                const price = parts[2] ? parseFloat(parts[2].replace(',', '.')) : 7.50;
+                                dayObj.meals.push({
+                                    id: 'imp_' + Date.now() + '_' + index,
+                                    title: title,
+                                    description: 'Importiertes Gericht vom Speiseplan',
+                                    price: isNaN(price) ? 7.50 : price,
+                                    image: '',
+                                    tags: ['Bio'],
+                                    allergens: [],
+                                    calories: 550
+                                });
+                            }
+                        }
+                    });
+
+                    this.saveMenu();
+                    this.showImportModal = false;
+                    this.notify('Speiseplan erfolgreich importiert!', 'success');
+                },
+
+                checkAllergenConflict(meal) {
+                    if (!this.currentUser) return [];
+                    const warnings = [];
+
+                    if (this.currentUser.allergens && Array.isArray(this.currentUser.allergens) && meal.allergens) {
+                        meal.allergens.forEach(all => {
+                            if (this.currentUser.allergens.includes(all)) {
+                                warnings.push(`Enthält dein Allergen: ${all}`);
+                            }
+                        });
+                    }
+
+                    if (this.currentUser.diet === 'Vegan' && !meal.tags.includes('Vegan')) {
+                        warnings.push('Nicht als Vegan deklariert');
+                    } else if (this.currentUser.diet === 'Vegetarisch' && !meal.tags.includes('Vegetarisch') && !meal.tags.includes('Vegan')) {
+                        warnings.push('Nicht als Vegetarisch deklariert');
+                    }
+
+                    return warnings;
+                },
+
+                bookMeal(dayId, mealId, guestCount = 0) {
+                    if (!this.currentUser || this.isDeadlinePassed) return;
+
+                    this.bookings = this.bookings.filter(b => !(b.userId === this.currentUser.id && b.dayId === dayId));
+
+                    this.bookings.push({
+                        id: 'bk_' + Date.now(),
+                        userId: this.currentUser.id,
+                        dayId: dayId,
+                        mealId: mealId,
+                        guestCount: parseInt(guestCount) || 0,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    this.saveBookings();
+                    this.notify('Bestellung verbindlich eingetragen!', 'success');
+                },
+
+                cancelBooking(dayId, mealId) {
+                    if (!this.currentUser || this.isDeadlinePassed) return;
+                    this.bookings = this.bookings.filter(b => !(b.userId === this.currentUser.id && b.dayId === dayId && b.mealId === mealId));
+                    this.saveBookings();
+                    this.notify('Bestellung storniert.', 'info');
+                },
+
+                hasBooking(dayId, mealId) {
+                    if (!this.currentUser) return false;
+                    return this.bookings.some(b => b.userId === this.currentUser.id && b.dayId === dayId && b.mealId === mealId);
+                },
+
+                getBookingGuestText(dayId, mealId) {
+                    if (!this.currentUser) return '';
+                    const b = this.bookings.find(b => b.userId === this.currentUser.id && b.dayId === dayId && b.mealId === mealId);
+                    if (b && b.guestCount > 0) {
+                        return `(+${b.guestCount} Gast)`;
+                    }
+                    return '';
+                },
+
+                rateMeal(mealId, dayId, stars) {
+                    if (!this.currentUser) return;
+                    
+                    const existingIdx = this.ratings.findIndex(r => r.userId === this.currentUser.id && r.mealId === mealId && r.dayId === dayId);
+                    if (existingIdx !== -1) {
+                        this.ratings[existingIdx].rating = stars;
+                    } else {
+                        this.ratings.push({
+                            id: 'rat_' + Date.now(),
+                            userId: this.currentUser.id,
+                            mealId: mealId,
+                            dayId: dayId,
+                            rating: stars
+                        });
+                    }
+                    this.saveRatings();
+                    this.notify(`Bewertung (${stars} Sterne) gespeichert.`, 'success');
+                },
+
+                getUserRating(mealId, dayId) {
+                    if (!this.currentUser) return 0;
+                    const found = this.ratings.find(r => r.userId === this.currentUser.id && r.mealId === mealId && r.dayId === dayId);
+                    return found ? found.rating : 0;
+                },
+
+                getMealAverageRating(mealId) {
+                    const mealRatings = this.ratings.filter(r => r.mealId === mealId);
+                    if (mealRatings.length === 0) return null;
+                    const sum = mealRatings.reduce((acc, r) => acc + r.rating, 0);
+                    return (sum / mealRatings.length).toFixed(1);
+                },
+
+                getDayTotalPortions(dayId) {
+                    const dayBookings = this.bookings.filter(b => b.dayId === dayId);
+                    let total = 0;
+                    dayBookings.forEach(b => {
+                        total += 1 + (parseInt(b.guestCount) || 0);
+                    });
+                    return total;
+                },
+
+                getMealPortionSummary(dayId, mealId) {
+                    const mealBookings = this.bookings.filter(b => b.dayId === dayId && b.mealId === mealId);
+                    let emp = mealBookings.length;
+                    let guests = mealBookings.reduce((sum, b) => sum + (parseInt(b.guestCount) || 0), 0);
+                    return { employee: emp, guest: guests, total: emp + guests };
+                },
+
+                getUserDayBookingText(userId, dayId) {
+                    const booking = this.bookings.find(b => b.userId === userId && b.dayId === dayId);
+                    if (!booking) return '-';
+                    
+                    const day = this.menuPlan.find(d => d.id === dayId);
+                    if (!day) return '-';
+                    const meal = day.meals.find(m => m.id === booking.mealId);
+                    if (!meal) return 'Gebucht';
+
+                    let text = meal.title;
+                    if (booking.guestCount > 0) {
+                        text += ` (+${booking.guestCount} Gast)`;
+                    }
+                    return text;
+                },
+
+                exportICS() {
+                    if (!this.currentUser) return;
+                    const userBookings = this.bookings.filter(b => b.userId === this.currentUser.id);
+
+                    if (userBookings.length === 0) {
+                        this.notify('Keine Buchungen für den Kalenderexport gefunden.', 'warning');
+                        return;
+                    }
+
+                    let icsContent = [
+                        'BEGIN:VCALENDAR',
+                        'VERSION:2.0',
+                        'PRODID:-//Corporate LunchVote Pro//DE',
+                        'CALSCALE:GREGORIAN',
+                        'METHOD:PUBLISH'
+                    ];
+
+                    userBookings.forEach(booking => {
+                        const day = this.menuPlan.find(d => d.id === booking.dayId);
+                        if (!day) return;
+                        const meal = day.meals.find(m => m.id === booking.mealId);
+                        if (!meal) return;
+
+                        const dateStr = day.date.replace(/-/g, '');
+                        icsContent.push(
+                            'BEGIN:VEVENT',
+                            `UID:lunch-${booking.id}@lunchvote.pro`,
+                            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+                            `DTSTART:${dateStr}T120000Z`,
+                            `DTEND:${dateStr}T123000Z`,
+                            `SUMMARY:Mittagessen: ${meal.title.replace(/,/g, '\\,')}`,
+                            `DESCRIPTION:Bestelltes Gericht: ${meal.title}\\nGäste: ${booking.guestCount}`,
+                            'LOCATION:Betriebsrestaurant',
+                            'END:VEVENT'
+                        );
+                    });
+
+                    icsContent.push('END:VCALENDAR');
+
+                    const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+                    const link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.setAttribute('download', `lunch_plan_${this.currentUser.username}.ics`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    this.notify('ICS Kalenderdatei heruntergeladen!', 'success');
+                },
+
+                exportCSV() {
+                    let csv = 'Wochentag;Datum;Gericht ID;Gericht Name;Anzahl Mitarbeiter;Anzahl Gaeste;Gesamt Portionen\n';
+
+                    this.menuPlan.forEach(day => {
+                        day.meals.forEach(meal => {
+                            const summary = this.getMealPortionSummary(day.id, meal.id);
+                            if (summary.total > 0) {
+                                csv += `"${day.dayName}";"${day.date}";"${meal.id}";"${meal.title}";${summary.employee};${summary.guest};${summary.total}\n`;
+                            }
+                        });
+                    });
+
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.setAttribute('download', `catering_bestellung_${new Date().toISOString().slice(0, 10)}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    this.notify('CSV-Bestellliste heruntergeladen!', 'success');
+                },
+
+                triggerPrint() {
+                    window.print();
+                }
+            };
+        }
+    </script>
+</body>
+</html>
